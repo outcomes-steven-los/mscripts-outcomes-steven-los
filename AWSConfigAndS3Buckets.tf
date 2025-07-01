@@ -67,6 +67,21 @@ resource "aws_s3_bucket_policy" "access_logs_policy" {
   })
 }
 
+resource "aws_s3_bucket_versioning" "access_logs_versioning" {
+  bucket = aws_s3_bucket.access_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "access_logs_block_public" {
+  bucket = aws_s3_bucket.access_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 # ------------------------------
 # CONFIG BUCKET
 # ------------------------------
@@ -136,6 +151,21 @@ resource "aws_s3_bucket_policy" "config_logs_policy" {
       }
     ]
   })
+}
+
+resource "aws_s3_bucket_versioning" "config_logs_versioning" {
+  bucket = aws_s3_bucket.config_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "config_logs_block_public" {
+  bucket = aws_s3_bucket.config_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 # ------------------------------
