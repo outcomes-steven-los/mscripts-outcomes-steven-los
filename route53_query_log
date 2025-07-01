@@ -49,8 +49,8 @@ data "aws_route53_zones" "public" {
 
 # Step 5: Enable Query Logging for each public zone
 resource "aws_route53_query_log" "this" {
-  for_each                   = { for z in data.aws_route53_zones.public.names : z.id => z }
-  zone_id                    = each.key
-  cloudwatch_log_group_arn   = aws_cloudwatch_log_group.route53_query_logs.arn
-  cloudwatch_log_role_arn    = aws_iam_role.route53_query_logging.arn
+  for_each                 = { for z in data.aws_route53_zones.public.zones : z.id => z }
+  zone_id                  = each.key
+  cloudwatch_log_group_arn = aws_cloudwatch_log_group.route53_query_logs.arn
+  cloudwatch_log_role_arn  = aws_iam_role.route53_query_logging.arn
 }
