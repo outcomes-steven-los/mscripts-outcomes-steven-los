@@ -43,6 +43,7 @@ resource "aws_launch_template" "eks_launch_template" {
     ebs {
       volume_size = 20
       volume_type = "gp3"
+      encrypted   = true    # <-- NEW: EBS.1 – EBS Encryption Enabled
     }
   }
 
@@ -97,6 +98,14 @@ resource "aws_eks_cluster" "mscripts" {
     security_group_ids = [aws_security_group.eks_security_group.id]
     subnet_ids         = var.aws_subnets
   }
+
+  enabled_cluster_log_types = [  # <-- NEW: EKS.6 – Control Plane Logging Enabled
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler"
+  ]
 
   depends_on = [
     aws_iam_role_policy_attachment.AmazonEKSCluster_ManagedPolicies,
