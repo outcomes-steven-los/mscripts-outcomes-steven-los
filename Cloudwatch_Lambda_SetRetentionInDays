@@ -1,0 +1,11 @@
+$logGroups = aws logs describe-log-groups | ConvertFrom-Json
+
+foreach ($group in $logGroups.logGroups) {
+    $logGroupName = $group.logGroupName
+    $retentionInDays = $group.retentionInDays
+
+    if (-not $retentionInDays -or $retentionInDays -lt 396) {
+        Write-Host "Updating retention for $logGroupName to 397 days"
+        aws logs put-retention-policy --log-group-name $logGroupName --retention-in-days 397
+    }
+}
