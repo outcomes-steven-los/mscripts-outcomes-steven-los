@@ -28,6 +28,14 @@ resource "aws_eks_cluster" "mscripts" {
     subnet_ids         = var.aws_subnets
   }
 
+  enabled_cluster_log_types = [   # <-- NEW: Enables critical EKS log types
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler"
+  ]
+
   depends_on = [
     aws_iam_role_policy_attachment.AmazonEKSClusterPolicy,
     aws_iam_role_policy_attachment.AmazonEKSVPCResourceController,
@@ -64,10 +72,10 @@ resource "aws_launch_template" "eks_launch_template" {
   block_device_mappings {
     device_name = "/dev/xvda"
 
-    ebs {
-      volume_size = 50
-      volume_type = "gp3"
-    }
+  ebs {
+    volume_size = 50
+    volume_type = "gp3"
+    encrypted   = true   # <-- NEW: Enables encryption on root EBS volume
   }
 
   user_data = base64encode(<<-EOF
