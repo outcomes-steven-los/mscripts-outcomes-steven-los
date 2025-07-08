@@ -28,7 +28,7 @@ resource "aws_eks_cluster" "mscripts" {
     subnet_ids         = var.aws_subnets
   }
 
-  enabled_cluster_log_types = [   # <-- NEW: Enables critical EKS log types
+  enabled_cluster_log_types = [   # <-- NEW: EKS.6 – Control Plane Logging Enabled
     "api",
     "audit",
     "authenticator",
@@ -75,7 +75,7 @@ resource "aws_launch_template" "eks_launch_template" {
   ebs {
     volume_size = 50
     volume_type = "gp3"
-    encrypted   = true   # <-- NEW: Enables encryption on root EBS volume
+    encrypted   = true   # <-- NEW: EBS.1 – EBS Encryption Enabled
   }
 
   user_data = base64encode(<<-EOF
