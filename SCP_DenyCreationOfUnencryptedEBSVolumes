@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyUnencryptedEBSVolumeCreation",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:RunInstances",
+        "ec2:CreateVolume"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "BoolIfExists": {
+          "ec2:Encrypted": "false"
+        }
+      }
+    }
+  ]
+}
