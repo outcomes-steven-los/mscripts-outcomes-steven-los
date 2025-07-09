@@ -1,1 +1,18 @@
-
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyGuardDutyDisableAndDisrupt",
+      "Effect": "Deny",
+      "Action": [
+        "guardduty:DeleteDetector",
+        "guardduty:UpdateDetector",
+        "guardduty:DisassociateFromAdministratorAccount",
+        "guardduty:DisassociateMembers",
+        "guardduty:DeleteMembers",
+        "guardduty:StopMonitoringMember"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
