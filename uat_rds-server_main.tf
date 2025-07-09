@@ -35,7 +35,7 @@ resource "aws_db_instance" "rds-server" {
   final_snapshot_identifier = "${var.identifier}-final-snapshot"
   allow_major_version_upgrade = true
   auto_minor_version_upgrade = true  # <-- NEW: RDS.13 – Automatic minor version upgrades should be enabled
-  username             = "admin"
+  username             = "dbadmin"   # <-- NEW: RDS.25 - RDS database instances should use a custom administrator username
   password             = var.password
   iam_database_authentication_enabled = true
   deletion_protection = true
