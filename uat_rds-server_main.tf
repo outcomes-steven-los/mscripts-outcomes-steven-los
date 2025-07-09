@@ -17,6 +17,7 @@ provider "aws" {
 resource "aws_db_instance" "rds-server" {
   identifier        = var.identifier
   engine            = "mysql"
+  publicly_accessible = false  # <-- RDS.2 
   backup_retention_period = 7
   instance_class    = var.instance_class
   storage_type      = "gp3"
