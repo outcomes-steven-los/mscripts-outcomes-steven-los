@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyUnapprovedEC2InstanceTypes",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotLike": {
+          "ec2:InstanceType": [
+            "t3.*",
+            "t3a.*",
+            "t4g.*",
+            "m6g.*",
+            "m5.*",
+            "c6g.*"
+          ]
+        }
+      }
+    }
+  ]
+}
