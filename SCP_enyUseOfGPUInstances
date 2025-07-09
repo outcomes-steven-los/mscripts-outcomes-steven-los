@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyGPUInstanceTypes",
+      "Effect": "Deny",
+      "Action": "ec2:RunInstances",
+      "Resource": "*",
+      "Condition": {
+        "StringLike": {
+          "ec2:InstanceType": [
+            "p2*",
+            "p3*",
+            "p4*",
+            "p5*",
+            "g2*",
+            "g3*",
+            "g4*",
+            "g4dn*",
+            "g5*",
+            "inf1*",
+            "inf2*",
+            "trn1*",
+            "dl1*",
+            "vt1*"
+          ]
+        }
+      }
+    }
+  ]
+}
