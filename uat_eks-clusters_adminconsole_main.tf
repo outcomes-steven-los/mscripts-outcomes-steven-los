@@ -16,18 +16,15 @@ provider "aws" {
 #############
 #####EKS#####
 #############
+
 data "aws_ssm_parameter" "ami" {
   name = var.eks_ami_namespace
 }
 
-
-
 resource "aws_launch_template" "eks_launch_template" {
-  #image_id = "ami-051de2e7ef084cafa"
-  image_id = data.aws_ssm_parameter.ami.value
-  key_name = var.ec2_key_pairs
-  #instance_type = "t3.medium"
-  instance_type = "m5.xlarge"
+  image_id               = data.aws_ssm_parameter.ami.value
+  key_name               = var.ec2_key_pairs
+  instance_type          = "m5.xlarge"
   vpc_security_group_ids = var.mx_management_sg_ids
 
   block_device_mappings {
@@ -36,6 +33,8 @@ resource "aws_launch_template" "eks_launch_template" {
     ebs {
       volume_size = 100
       volume_type = "gp3"
+      encrypted   = true   # <-- NEW: EBS.1 – EBS Encryption Enabled
+      # kms_key_id = var.ebs_kms_key_id  # Optional: uncomment to use customer-managed key
     }
   }
 
@@ -44,11 +43,10 @@ resource "aws_launch_template" "eks_launch_template" {
     api-server = "${aws_eks_cluster.mscripts.endpoint}"
     cluster-certificate = "${aws_eks_cluster.mscripts.certificate_authority[0].data}"
     cluster-name = "${aws_eks_cluster.mscripts.name}"
- 
+
     [settings.host-containers.admin]
     enabled = true
     superpowered = false
- 
   EOF
   )
 
@@ -62,19 +60,24 @@ resource "aws_launch_template" "eks_launch_template" {
 }
 
 resource "aws_eks_cluster" "mscripts" {
-  enabled_cluster_log_types = ["api", "audit"]
   name     = "${var.cluster_name}-${var.context}"
   role_arn = aws_iam_role.cluster.arn
   version  = var.eks_version
 
-  
+  enabled_cluster_log_types = [ # <-- NEW: EKS.6 – Control Plane Logging Enabled
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler"
+  ]
 
   vpc_config {
-    security_group_ids = [aws_security_group.eks_security_group.id]
-    subnet_ids         = var.aws_subnets
-    endpoint_private_access = true
-    endpoint_public_access  = true
-    public_access_cidrs     = var.public_access_cidrs
+    security_group_ids       = [aws_security_group.eks_security_group.id]
+    subnet_ids               = var.aws_subnets
+    endpoint_private_access  = true
+    endpoint_public_access   = true
+    public_access_cidrs      = var.public_access_cidrs
   }
 
   depends_on = [
