@@ -34,7 +34,7 @@ resource "aws_db_instance" "rds-server" {
   skip_final_snapshot = false
   final_snapshot_identifier = "${var.identifier}-final-snapshot"
   allow_major_version_upgrade = true
-  auto_minor_version_upgrade = false
+  auto_minor_version_upgrade = true  # <-- NEW: RDS.13 – Automatic minor version upgrades should be enabled
   username             = "admin"
   password             = var.password
   iam_database_authentication_enabled = true
