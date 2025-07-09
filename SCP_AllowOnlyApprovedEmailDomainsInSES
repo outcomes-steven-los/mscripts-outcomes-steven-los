@@ -1,0 +1,22 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyUnapprovedSESFromAddresses",
+      "Effect": "Deny",
+      "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotLike": {
+          "ses:FromAddress": [
+            "*@company.com",
+            "*@corp.internal"
+          ]
+        }
+      }
+    }
+  ]
+}
