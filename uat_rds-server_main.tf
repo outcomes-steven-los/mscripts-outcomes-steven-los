@@ -17,7 +17,9 @@ provider "aws" {
 resource "aws_db_instance" "rds-server" {
   identifier        = var.identifier
   engine            = "mysql"
-  publicly_accessible = false  # <-- NEW: RDS.2 RDS DB Instances should prohibit public access
+  publicly_accessible = false   # <-- NEW: RDS.2 RDS DB Instances should prohibit public access
+  monitoring_interval = 60      # <-- NEW: RDS.6 Enhanced monitoring should be configured for RDS DB instances
+  monitoring_role_arn = var.enhanced_monitoring_role_arn # <-- NEW: RDS.6 Enhanced monitoring should be configured for RDS DB instances
   backup_retention_period = 7
   instance_class    = var.instance_class
   storage_type      = "gp3"
