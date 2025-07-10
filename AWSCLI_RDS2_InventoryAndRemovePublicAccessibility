@@ -1,1 +1,67 @@
+# Parameters
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "RDS_PublicAccess_PreChange_$timestamp.csv"
+$postChangeCsv = "RDS_PublicAccess_PostChange_$timestamp.csv"
+$region = "us-east-1"  # Update if needed
 
+# Step 1: Get all DB instances
+Write-Host "`Gathering RDS DB instances......" -ForegroundColor Cyan
+$rdsInstancesJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$rdsInstances = $rdsInstancesJson.DBInstances
+
+$preChangeData = @()
+
+foreach ($db in $rdsInstances) {
+    $preChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier = $db.DBInstanceIdentifier
+        Engine               = $db.Engine
+        DBInstanceClass      = $db.DBInstanceClass
+        PubliclyAccessible   = $db.PubliclyAccessible
+        Endpoint             = $db.Endpoint.Address
+        VPC                  = $db.DBSubnetGroup.VpcId
+        ARN                  = $db.DBInstanceArn
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change RDS access status to $preChangeCsv" -ForegroundColor Green
+
+# Step 2: Modify instances with Public Access = true
+Write-Host "Disabling public access where needed......" -ForegroundColor Cyan
+
+foreach ($db in $preChangeData) {
+    if ($db.PubliclyAccessible -eq $true) {
+        Write-Host " - Modifying $($db.DBInstanceIdentifier) to disable public access..." -ForegroundColor Yellow
+
+        aws rds modify-db-instance `
+            --db-instance-identifier $db.DBInstanceIdentifier `
+            --publicly-accessible false `
+            --apply-immediately `
+            --region $region | Out-Null
+    }
+}
+
+# Step 3: Wait briefly for propagation
+Write-Host "Waiting 60 Seconds for settings to apply......" -ForegroundColor Cyan
+Start-Sleep -Seconds 60  # You can increase if needed based on environment
+
+# Step 4: Verify and export post-change data
+Write-Host "Verifying updated public access settings......" -ForegroundColor Cyan
+
+$rdsInstancesJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$postChangeData = @()
+
+foreach ($db in $rdsInstancesJson.DBInstances) {
+    $postChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier = $db.DBInstanceIdentifier
+        Engine               = $db.Engine
+        DBInstanceClass      = $db.DBInstanceClass
+        PubliclyAccessible   = $db.PubliclyAccessible
+        Endpoint             = $db.Endpoint.Address
+        VPC                  = $db.DBSubnetGroup.VpcId
+        ARN                  = $db.DBInstanceArn
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change RDS access status to $postChangeCsv" -ForegroundColor Green
