@@ -1,1 +1,72 @@
 
+# Config
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "EKS_AuditLogging_PreChange_$timestamp.csv"
+$postChangeCsv = "EKS_AuditLogging_PostChange_$timestamp.csv"
+$region = "us-east-1"
+
+# Step 1: List EKS clusters
+Write-Host "Discovering EKS clusters......" -ForegroundColor Cyan
+$clusterNames = aws eks list-clusters --region $region | ConvertFrom-Json | Select-Object -ExpandProperty clusters
+
+$preChangeData = @()
+
+foreach ($cluster in $clusterNames) {
+    $desc = aws eks describe-cluster --name $cluster --region $region | ConvertFrom-Json
+    $logging = $desc.cluster.logging.clusterLogging
+
+    $auditLog = ($logging | Where-Object { $_.types -contains "audit" }).enabled
+
+    $preChangeData += [PSCustomObject]@{
+        ClusterName     = $cluster
+        AuditLogging    = if ($auditLog) { "Enabled" } else { "Disabled" }
+        LoggingTypes    = ($logging | ForEach-Object { "$($_.types):$($_.enabled)" }) -join "; "
+        Arn             = $desc.cluster.arn
+        Endpoint        = $desc.cluster.endpoint
+        Status          = $desc.cluster.status
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change EKS audit logging status to $preChangeCsv" -ForegroundColor Green
+
+# Step 2: Enable audit logging if missing
+Write-Host "Enabling audit logging where missing......" -ForegroundColor Cyan
+
+foreach ($entry in $preChangeData) {
+    if ($entry.AuditLogging -ne "Enabled") {
+        Write-Host " - Enabling audit logging for cluster: $($entry.ClusterName)" -ForegroundColor Yellow
+
+        aws eks update-cluster-config `
+            --name $entry.ClusterName `
+            --logging '{"clusterLogging":[{"types":["audit"],"enabled":true}]}' `
+            --region $region | Out-Null
+    }
+}
+
+# Step 3: Wait for update to propagate
+Write-Host "Waiting 60 Seconds for config updates......" -ForegroundColor Cyan
+Start-Sleep -Seconds 60
+
+# Step 4: Post-change check
+Write-Host "Rechecking EKS audit logging configuration......" -ForegroundColor Cyan
+$postChangeData = @()
+
+foreach ($cluster in $clusterNames) {
+    $desc = aws eks describe-cluster --name $cluster --region $region | ConvertFrom-Json
+    $logging = $desc.cluster.logging.clusterLogging
+
+    $auditLog = ($logging | Where-Object { $_.types -contains "audit" }).enabled
+
+    $postChangeData += [PSCustomObject]@{
+        ClusterName     = $cluster
+        AuditLogging    = if ($auditLog) { "Enabled" } else { "Disabled" }
+        LoggingTypes    = ($logging | ForEach-Object { "$($_.types):$($_.enabled)" }) -join "; "
+        Arn             = $desc.cluster.arn
+        Endpoint        = $desc.cluster.endpoint
+        Status          = $desc.cluster.status
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change EKS audit logging status to $postChangeCsv" -ForegroundColor Green
