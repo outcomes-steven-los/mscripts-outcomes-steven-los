@@ -1,1 +1,64 @@
 
+# Configuration
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "RDS_DeletionProtection_PreChange_$timestamp.csv"
+$postChangeCsv = "RDS_DeletionProtection_PostChange_$timestamp.csv"
+$region = "us-east-1"
+
+# Step 1: Get all RDS instances
+Write-Host "Fetching all RDS DB instances......" -ForegroundColor Cyan
+$rdsInstancesJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$rdsInstances = $rdsInstancesJson.DBInstances
+
+$preChangeData = @()
+
+foreach ($db in $rdsInstances) {
+    $preChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier = $db.DBInstanceIdentifier
+        Engine               = $db.Engine
+        DBInstanceClass      = $db.DBInstanceClass
+        VPC                  = $db.DBSubnetGroup.VpcId
+        DeletionProtection   = $db.DeletionProtection
+        ARN                  = $db.DBInstanceArn
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change deletion protection status to $preChangeCsv" -ForegroundColor Green
+
+# Step 2: Enable deletion protection where needed
+Write-Host "Enabling deletion protection for non-compliant instances......" -ForegroundColor Cyan
+
+foreach ($db in $preChangeData) {
+    if ($db.DeletionProtection -ne $true) {
+        Write-Host " - Enabling Deletion Protection for: $($db.DBInstanceIdentifier)" -ForegroundColor Yellow
+
+        aws rds modify-db-instance `
+            --db-instance-identifier $db.DBInstanceIdentifier `
+            --deletion-protection `
+            --region $region | Out-Null
+    }
+}
+
+# Step 3: Wait for propagation
+Write-Host "Waiting 60 Seconds for changes to apply......" -ForegroundColor Cyan
+Start-Sleep -Seconds 60
+
+# Step 4: Re-check and export updated status
+Write-Host "Verifying deletion protection status......" -ForegroundColor Cyan
+$rdsInstancesJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$postChangeData = @()
+
+foreach ($db in $rdsInstancesJson.DBInstances) {
+    $postChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier = $db.DBInstanceIdentifier
+        Engine               = $db.Engine
+        DBInstanceClass      = $db.DBInstanceClass
+        VPC                  = $db.DBSubnetGroup.VpcId
+        DeletionProtection   = $db.DeletionProtection
+        ARN                  = $db.DBInstanceArn
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change deletion protection status to $postChangeCsv" -ForegroundColor Green
