@@ -1,5 +1,5 @@
 
-# Config
+# Configuration
 $s3BucketName = "my-elb-access-logs"    # <-- Replace with your bucket
 $s3Prefix = "alb-logs"                  # Optional
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
