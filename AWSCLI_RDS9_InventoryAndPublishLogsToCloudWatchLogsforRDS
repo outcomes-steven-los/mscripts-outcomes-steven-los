@@ -1,1 +1,109 @@
 
+# Configuration
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "RDS_LogExports_PreChange_$timestamp.csv"
+$postChangeCsv = "RDS_LogExports_PostChange_$timestamp.csv"
+$region = "us-east-1" # Update if needed
+
+# Log type map by engine substring
+$logTypeMap = @{
+    "mysql"               = @("error", "general", "slowquery", "audit")
+    "mariadb"             = @("error", "general", "slowquery", "audit")
+    "postgres"            = @("postgresql", "upgrade")
+    "aurora-mysql"        = @("audit", "error", "general", "slowquery")
+    "aurora-postgresql"   = @("postgresql")
+    "oracle"              = @("alert", "audit", "trace", "listener")
+    "sqlserver"           = @("error", "agent")
+}
+
+# Step 1: Get all RDS instances
+Write-Host "Gathering RDS DB instances......" -ForegroundColor Cyan
+$rdsJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$dbInstances = $rdsJson.DBInstances
+
+$preChangeData = @()
+
+foreach ($db in $dbInstances) {
+    $engine = $db.Engine.ToLower()
+    $enabledLogs = $db.EnabledCloudwatchLogsExports
+    $requiredLogs = $null
+
+    foreach ($key in $logTypeMap.Keys) {
+        if ($engine -like "*$key*") {
+            $requiredLogs = $logTypeMap[$key]
+            break
+        }
+    }
+
+    if (-not $requiredLogs) { continue }
+
+    $missingLogs = $requiredLogs | Where-Object { $_ -notin $enabledLogs }
+
+    $preChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier = $db.DBInstanceIdentifier
+        Engine               = $db.Engine
+        EnabledLogExports    = ($enabledLogs -join ", ")
+        RequiredLogTypes     = ($requiredLogs -join ", ")
+        MissingLogTypes      = ($missingLogs -join ", ")
+        ARN                  = $db.DBInstanceArn
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change log export status to $preChangeCsv" -ForegroundColor Green
+
+# Step 2: Enable missing log exports
+Write-Host "Enabling missing CloudWatch log exports......" -ForegroundColor Cyan
+
+foreach ($entry in $preChangeData) {
+    if ($entry.MissingLogTypes) {
+        Write-Host " - Enabling logs for: $($entry.DBInstanceIdentifier)" -ForegroundColor Yellow
+
+        $logTypes = $entry.RequiredLogTypes.Split(",") | ForEach-Object { $_.Trim() }
+        $logArgs = $logTypes | ForEach-Object { "--cloudwatch-logs-export-configuration EnableLogTypes=$_" } -join " "
+
+        aws rds modify-db-instance `
+            --db-instance-identifier $entry.DBInstanceIdentifier `
+            --apply-immediately `
+            --cloudwatch-logs-export-configuration "EnableLogTypes=$($logTypes -join ",")" `
+            --region $region | Out-Null
+    }
+}
+
+# Step 3: Wait for configuration to apply
+Write-Host "Waiting 60 Seconds for configuration to apply......." -ForegroundColor Cyan
+Start-Sleep -Seconds 60
+
+# Step 4: Verify and export post-change status
+Write-Host "Verifying log export status..." -ForegroundColor Cyan
+$rdsJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$postChangeData = @()
+
+foreach ($db in $rdsJson.DBInstances) {
+    $engine = $db.Engine.ToLower()
+    $enabledLogs = $db.EnabledCloudwatchLogsExports
+    $requiredLogs = $null
+
+    foreach ($key in $logTypeMap.Keys) {
+        if ($engine -like "*$key*") {
+            $requiredLogs = $logTypeMap[$key]
+            break
+        }
+    }
+
+    if (-not $requiredLogs) { continue }
+
+    $missingLogs = $requiredLogs | Where-Object { $_ -notin $enabledLogs }
+
+    $postChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier = $db.DBInstanceIdentifier
+        Engine               = $db.Engine
+        EnabledLogExports    = ($enabledLogs -join ", ")
+        RequiredLogTypes     = ($requiredLogs -join ", ")
+        MissingLogTypes      = ($missingLogs -join ", ")
+        ARN                  = $db.DBInstanceArn
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change log export status to $postChangeCsv" -ForegroundColor Green
