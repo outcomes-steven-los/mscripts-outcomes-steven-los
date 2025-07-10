@@ -42,7 +42,7 @@ resource "aws_db_instance" "rds-server" {
   performance_insights_enabled = true
   performance_insights_kms_key_id = var.performance_insights_kms_key_id
   copy_tags_to_snapshot        = true
-  multi_az = true # <-- NEW: RDS.15 - RDS DB clusters should be configured for multiple Availability Zones
+  multi_az = false
   enabled_cloudwatch_logs_exports = ["audit", "error", "general", "slowquery"] # <-- NEW: RDS.9 – RDS DB instances should publish logs to CloudWatch Logs
   
 lifecycle {
