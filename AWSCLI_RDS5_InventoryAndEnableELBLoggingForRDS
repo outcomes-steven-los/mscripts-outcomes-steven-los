@@ -9,7 +9,7 @@ $region = "us-east-1" # Update if needed
 
 $preChangeData = @()
 
-# --- Step 1: Get ALBs ---
+# Step 1: Get ALBs
 Write-Host "Checking Application Load Balancers (ALBs)......" -ForegroundColor Cyan
 $albs = (aws elbv2 describe-load-balancers --region $region | ConvertFrom-Json).LoadBalancers
 
@@ -29,7 +29,7 @@ foreach ($alb in $albs) {
     }
 }
 
-# --- Step 2: Get CLBs ---
+# Step 2: Get CLBs
 Write-Host "Checking Classic Load Balancers (CLBs)......" -ForegroundColor Cyan
 $clbs = (aws elb describe-load-balancers --region $region | ConvertFrom-Json).LoadBalancerDescriptions
 
@@ -52,7 +52,7 @@ foreach ($clb in $clbs) {
 $preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
 Write-Host "Exported pre-change logging status to $preChangeCsv" -ForegroundColor Green
 
-# --- Step 3: Enable Logging Where Missing ---
+# Step 3: Enable Logging Where Missing
 Write-Host "Enabling logging where disabled......" -ForegroundColor Cyan
 
 foreach ($elb in $preChangeData) {
@@ -78,7 +78,7 @@ foreach ($elb in $preChangeData) {
     }
 }
 
-# --- Step 4: Re-inventory and Export Post-Change ---
+# Step 4: Re-inventory and Export Post-Change
 Write-Host "Verifying logging configuration......" -ForegroundColor Cyan
 $postChangeData = @()
 
@@ -115,4 +115,4 @@ foreach ($clb in $clbs) {
 }
 
 $postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
-Write-Host "[✔] Exported post-change logging status to $postChangeCsv" -ForegroundColor Green
+Write-Host "Exported post-change logging status to $postChangeCsv" -ForegroundColor Green
