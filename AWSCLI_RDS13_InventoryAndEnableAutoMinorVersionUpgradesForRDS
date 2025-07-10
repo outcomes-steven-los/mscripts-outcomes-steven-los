@@ -1,0 +1,66 @@
+# Parameters
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "RDS_AutoMinorUpgrade_PreChange_$timestamp.csv"
+$postChangeCsv = "RDS_AutoMinorUpgrade_PostChange_$timestamp.csv"
+$region = "us-east-1"
+
+# Step 1: List all RDS instances
+Write-Host "Fetching all RDS instances......" -ForegroundColor Cyan
+$rdsInstancesJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$rdsInstances = $rdsInstancesJson.DBInstances
+
+$preChangeData = @()
+
+foreach ($db in $rdsInstances) {
+    $preChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier     = $db.DBInstanceIdentifier
+        Engine                   = $db.Engine
+        EngineVersion            = $db.EngineVersion
+        AutoMinorVersionUpgrade = $db.AutoMinorVersionUpgrade
+        DBInstanceClass          = $db.DBInstanceClass
+        VPC                      = $db.DBSubnetGroup.VpcId
+        ARN                      = $db.DBInstanceArn
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change auto-upgrade status to $preChangeCsv" -ForegroundColor Green
+
+# Step 2: Modify where needed
+Write-Host "Enabling Auto Minor Version Upgrade......" -ForegroundColor Cyan
+
+foreach ($db in $preChangeData) {
+    if ($db.AutoMinorVersionUpgrade -ne $true) {
+        Write-Host " - Enabling auto-upgrade for: $($db.DBInstanceIdentifier)" -ForegroundColor Yellow
+
+        aws rds modify-db-instance `
+            --db-instance-identifier $db.DBInstanceIdentifier `
+            --auto-minor-version-upgrade `
+            --apply-immediately `
+            --region $region | Out-Null
+    }
+}
+
+# Step 3: Wait for change propagation
+Write-Host "Waiting Seconds 60 for changes to take effect......" -ForegroundColor Cyan
+Start-Sleep -Seconds 60
+
+# Step 4: Re-check and export post-change data
+Write-Host "Verifying auto-upgrade status......" -ForegroundColor Cyan
+$rdsInstancesJson = aws rds describe-db-instances --region $region | ConvertFrom-Json
+$postChangeData = @()
+
+foreach ($db in $rdsInstancesJson.DBInstances) {
+    $postChangeData += [PSCustomObject]@{
+        DBInstanceIdentifier     = $db.DBInstanceIdentifier
+        Engine                   = $db.Engine
+        EngineVersion            = $db.EngineVersion
+        AutoMinorVersionUpgrade = $db.AutoMinorVersionUpgrade
+        DBInstanceClass          = $db.DBInstanceClass
+        VPC                      = $db.DBSubnetGroup.VpcId
+        ARN                      = $db.DBInstanceArn
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change auto-upgrade status to $postChangeCsv" -ForegroundColor Green
