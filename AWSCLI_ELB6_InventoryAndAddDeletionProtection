@@ -1,0 +1,68 @@
+# Parameters
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "ELB_DeletionProtection_PreChange_$timestamp.csv"
+$postChangeCsv = "ELB_DeletionProtection_PostChange_$timestamp.csv"
+$region = "us-east-1"  # Update if needed
+
+# STEP 1: Inventory Current State 
+
+# Get all load balancers (ALB/NLB)
+$elbsJson = aws elbv2 describe-load-balancers --region $region | ConvertFrom-Json
+$elbs = $elbsJson.LoadBalancers
+
+# Initialize array for export
+$preChangeData = @()
+
+Write-Host "`Gathering current deletion protection status......" -ForegroundColor Cyan
+
+foreach ($elb in $elbs) {
+    $attributes = aws elbv2 describe-load-balancer-attributes --load-balancer-arn $elb.LoadBalancerArn --region $region | ConvertFrom-Json
+    $deletionProtection = ($attributes.Attributes | Where-Object { $_.Key -eq "deletion_protection.enabled" }).Value
+
+    $preChangeData += [PSCustomObject]@{
+        LoadBalancerName = $elb.LoadBalancerName
+        DNSName           = $elb.DNSName
+        Type              = $elb.Type
+        Scheme            = $elb.Scheme
+        DeletionProtection = $deletionProtection
+        ARN               = $elb.LoadBalancerArn
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change status to $preChangeCsv" -ForegroundColor Green
+
+# STEP 2: Apply deletion protection if not already enabled
+Write-Host "`Enabling deletion protection where needed..." -ForegroundColor Cyan
+
+foreach ($elb in $preChangeData) {
+    if ($elb.DeletionProtection -ne "true") {
+        Write-Host " - Enabling deletion protection for: $($elb.LoadBalancerName)" -ForegroundColor Yellow
+        aws elbv2 modify-load-balancer-attributes `
+            --load-balancer-arn $elb.ARN `
+            --attributes Key=deletion_protection.enabled,Value=true `
+            --region $region | Out-Null
+    }
+}
+
+# STEP 3: Re-Inventory Current State Post-Change
+Write-Host "`n[3/3] Verifying post-change status..." -ForegroundColor Cyan
+
+$postChangeData = @()
+
+foreach ($elb in $elbs) {
+    $attributes = aws elbv2 describe-load-balancer-attributes --load-balancer-arn $elb.LoadBalancerArn --region $region | ConvertFrom-Json
+    $deletionProtection = ($attributes.Attributes | Where-Object { $_.Key -eq "deletion_protection.enabled" }).Value
+
+    $postChangeData += [PSCustomObject]@{
+        LoadBalancerName = $elb.LoadBalancerName
+        DNSName           = $elb.DNSName
+        Type              = $elb.Type
+        Scheme            = $elb.Scheme
+        DeletionProtection = $deletionProtection
+        ARN               = $elb.LoadBalancerArn
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change status to $postChangeCsv" -ForegroundColor Green
