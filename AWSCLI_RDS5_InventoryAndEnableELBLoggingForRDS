@@ -1,1 +1,118 @@
 
+# Config
+$s3BucketName = "my-elb-access-logs"    # <-- Replace with your bucket
+$s3Prefix = "alb-logs"                  # Optional
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "ELB_Logging_PreChange_$timestamp.csv"
+$postChangeCsv = "ELB_Logging_PostChange_$timestamp.csv"
+$region = "us-east-1" # Update if needed
+
+$preChangeData = @()
+
+# --- Step 1: Get ALBs ---
+Write-Host "Checking Application Load Balancers (ALBs)......" -ForegroundColor Cyan
+$albs = (aws elbv2 describe-load-balancers --region $region | ConvertFrom-Json).LoadBalancers
+
+foreach ($alb in $albs) {
+    $attrs = aws elbv2 describe-load-balancer-attributes `
+        --load-balancer-arn $alb.LoadBalancerArn `
+        --region $region | ConvertFrom-Json
+
+    $logEnabled = ($attrs.Attributes | Where-Object { $_.Key -eq "access_logs.s3.enabled" }).Value
+
+    $preChangeData += [PSCustomObject]@{
+        LoadBalancerName = $alb.LoadBalancerName
+        Type             = "application"
+        DNSName          = $alb.DNSName
+        LoggingEnabled   = $logEnabled
+        ARN              = $alb.LoadBalancerArn
+    }
+}
+
+# --- Step 2: Get CLBs ---
+Write-Host "Checking Classic Load Balancers (CLBs)......" -ForegroundColor Cyan
+$clbs = (aws elb describe-load-balancers --region $region | ConvertFrom-Json).LoadBalancerDescriptions
+
+foreach ($clb in $clbs) {
+    $attrs = aws elb describe-load-balancer-attributes `
+        --load-balancer-name $clb.LoadBalancerName `
+        --region $region | ConvertFrom-Json
+
+    $logEnabled = $attrs.LoadBalancerAttributes.AccessLog.Enabled
+
+    $preChangeData += [PSCustomObject]@{
+        LoadBalancerName = $clb.LoadBalancerName
+        Type             = "classic"
+        DNSName          = $clb.DNSName
+        LoggingEnabled   = $logEnabled
+        ARN              = "n/a"
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change logging status to $preChangeCsv" -ForegroundColor Green
+
+# --- Step 3: Enable Logging Where Missing ---
+Write-Host "Enabling logging where disabled......" -ForegroundColor Cyan
+
+foreach ($elb in $preChangeData) {
+    if ($elb.LoggingEnabled -ne "true") {
+        if ($elb.Type -eq "application") {
+            Write-Host " - Enabling logging for ALB: $($elb.LoadBalancerName)" -ForegroundColor Yellow
+
+            aws elbv2 modify-load-balancer-attributes `
+                --load-balancer-arn $elb.ARN `
+                --attributes Key=access_logs.s3.enabled,Value=true `
+                            Key=access_logs.s3.bucket,Value=$s3BucketName `
+                            Key=access_logs.s3.prefix,Value=$s3Prefix `
+                --region $region | Out-Null
+        }
+        elseif ($elb.Type -eq "classic") {
+            Write-Host " - Enabling logging for CLB: $($elb.LoadBalancerName)" -ForegroundColor Yellow
+
+            aws elb modify-load-balancer-attributes `
+                --load-balancer-name $elb.LoadBalancerName `
+                --load-balancer-attributes "AccessLog={Enabled=true,S3BucketName=$s3BucketName,S3BucketPrefix=$s3Prefix,EmitInterval=5}" `
+                --region $region | Out-Null
+        }
+    }
+}
+
+# --- Step 4: Re-inventory and Export Post-Change ---
+Write-Host "Verifying logging configuration......" -ForegroundColor Cyan
+$postChangeData = @()
+
+foreach ($alb in $albs) {
+    $attrs = aws elbv2 describe-load-balancer-attributes `
+        --load-balancer-arn $alb.LoadBalancerArn `
+        --region $region | ConvertFrom-Json
+
+    $logEnabled = ($attrs.Attributes | Where-Object { $_.Key -eq "access_logs.s3.enabled" }).Value
+
+    $postChangeData += [PSCustomObject]@{
+        LoadBalancerName = $alb.LoadBalancerName
+        Type             = "application"
+        DNSName          = $alb.DNSName
+        LoggingEnabled   = $logEnabled
+        ARN              = $alb.LoadBalancerArn
+    }
+}
+
+foreach ($clb in $clbs) {
+    $attrs = aws elb describe-load-balancer-attributes `
+        --load-balancer-name $clb.LoadBalancerName `
+        --region $region | ConvertFrom-Json
+
+    $logEnabled = $attrs.LoadBalancerAttributes.AccessLog.Enabled
+
+    $postChangeData += [PSCustomObject]@{
+        LoadBalancerName = $clb.LoadBalancerName
+        Type             = "classic"
+        DNSName          = $clb.DNSName
+        LoggingEnabled   = $logEnabled
+        ARN              = "n/a"
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "[✔] Exported post-change logging status to $postChangeCsv" -ForegroundColor Green
