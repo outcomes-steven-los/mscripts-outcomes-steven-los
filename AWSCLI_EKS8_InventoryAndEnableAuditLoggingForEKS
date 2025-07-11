@@ -1,5 +1,5 @@
 
-# Config
+# Parameters
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "EKS_AuditLogging_PreChange_$timestamp.csv"
 $postChangeCsv = "EKS_AuditLogging_PostChange_$timestamp.csv"
