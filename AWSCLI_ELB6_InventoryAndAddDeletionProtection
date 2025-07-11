@@ -1,3 +1,4 @@
+
 # Parameters
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "ELB_DeletionProtection_PreChange_$timestamp.csv"
