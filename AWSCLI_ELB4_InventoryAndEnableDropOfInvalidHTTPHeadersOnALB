@@ -1,1 +1,73 @@
 
+# Configuration
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$preChangeCsv = "ALB_DropInvalidHeaders_PreChange_$timestamp.csv"
+$postChangeCsv = "ALB_DropInvalidHeaders_PostChange_$timestamp.csv"
+$region = "us-east-1" # Update if needed
+
+# Step 1: Get all ALBs
+Write-Host "Discovering Application Load Balancers......" -ForegroundColor Cyan
+$albs = (aws elbv2 describe-load-balancers --region $region | ConvertFrom-Json).LoadBalancers
+$preChangeData = @()
+
+foreach ($alb in $albs) {
+    if ($alb.Type -ne "application") { continue }
+
+    $attributes = aws elbv2 describe-load-balancer-attributes `
+        --load-balancer-arn $alb.LoadBalancerArn `
+        --region $region | ConvertFrom-Json
+
+    $dropInvalid = ($attributes.Attributes | Where-Object { $_.Key -eq "routing.http.drop_invalid_header_fields.enabled" }).Value
+
+    $preChangeData += [PSCustomObject]@{
+        LoadBalancerName   = $alb.LoadBalancerName
+        DNSName            = $alb.DNSName
+        DropInvalidHeaders = $dropInvalid
+        ARN                = $alb.LoadBalancerArn
+    }
+}
+
+$preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
+Write-Host "Exported pre-change ALB header validation status to $preChangeCsv" -ForegroundColor Green
+
+# Step 2: Enable the setting where not already 'true'
+Write-Host "Enabling drop_invalid_header_fields where needed......" -ForegroundColor Cyan
+
+foreach ($alb in $preChangeData) {
+    if ($alb.DropInvalidHeaders -ne "true") {
+        Write-Host " - Updating ALB: $($alb.LoadBalancerName)" -ForegroundColor Yellow
+
+        aws elbv2 modify-load-balancer-attributes `
+            --load-balancer-arn $alb.ARN `
+            --attributes Key=routing.http.drop_invalid_header_fields.enabled,Value=true `
+            --region $region | Out-Null
+    }
+}
+
+# Step 3: Wait a moment
+Write-Host "Waiting 60 Seconds for settings to propagate......" -ForegroundColor Cyan
+Start-Sleep -Seconds 60
+
+# Step 4: Recheck and export post-change state
+Write-Host "Verifying updated ALB header configuration......" -ForegroundColor Cyan
+$postChangeData = @()
+
+foreach ($alb in $albs) {
+    if ($alb.Type -ne "application") { continue }
+
+    $attributes = aws elbv2 describe-load-balancer-attributes `
+        --load-balancer-arn $alb.LoadBalancerArn `
+        --region $region | ConvertFrom-Json
+
+    $dropInvalid = ($attributes.Attributes | Where-Object { $_.Key -eq "routing.http.drop_invalid_header_fields.enabled" }).Value
+
+    $postChangeData += [PSCustomObject]@{
+        LoadBalancerName   = $alb.LoadBalancerName
+        DNSName            = $alb.DNSName
+        DropInvalidHeaders = $dropInvalid
+        ARN                = $alb.LoadBalancerArn
+    }
+}
+
+$postChangeData | Export-Csv -Path $postChangeCsv -NoTypeInformation
+Write-Host "Exported post-change ALB header validation status to $postChangeCsv" -ForegroundColor Green
