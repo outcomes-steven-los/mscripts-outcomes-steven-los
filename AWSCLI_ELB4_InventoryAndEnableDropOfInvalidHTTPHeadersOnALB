@@ -1,5 +1,5 @@
 
-# Configuration
+# Parameters
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "ALB_DropInvalidHeaders_PreChange_$timestamp.csv"
 $postChangeCsv = "ALB_DropInvalidHeaders_PostChange_$timestamp.csv"
