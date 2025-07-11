@@ -46,7 +46,7 @@ foreach ($elb in $preChangeData) {
 }
 
 # STEP 3: Re-Inventory Current State Post-Change
-Write-Host "`n[3/3] Verifying post-change status..." -ForegroundColor Cyan
+Write-Host "`n[3/3] Verifying post-change status......" -ForegroundColor Cyan
 
 $postChangeData = @()
 
