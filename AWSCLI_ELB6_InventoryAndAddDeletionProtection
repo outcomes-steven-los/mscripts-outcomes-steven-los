@@ -3,7 +3,7 @@
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "ELB_DeletionProtection_PreChange_$timestamp.csv"
 $postChangeCsv = "ELB_DeletionProtection_PostChange_$timestamp.csv"
-$region = "us-east-1"  # Update if needed
+$region = "us-east-1" # Update if needed
 
 # STEP 1: Inventory Current State 
 
