@@ -13,7 +13,7 @@ $elbs = $elbsJson.LoadBalancers
 # Initialize array for export
 $preChangeData = @()
 
-Write-Host "`Gathering current deletion protection status......" -ForegroundColor Cyan
+Write-Host "Gathering current deletion protection status......" -ForegroundColor Cyan
 
 foreach ($elb in $elbs) {
     $attributes = aws elbv2 describe-load-balancer-attributes --load-balancer-arn $elb.LoadBalancerArn --region $region | ConvertFrom-Json
