@@ -33,7 +33,7 @@ $preChangeData | Export-Csv -Path $preChangeCsv -NoTypeInformation
 Write-Host "Exported pre-change status to $preChangeCsv" -ForegroundColor Green
 
 # STEP 2: Apply deletion protection if not already enabled
-Write-Host "`Enabling deletion protection where needed..." -ForegroundColor Cyan
+Write-Host "`Enabling deletion protection where needed......" -ForegroundColor Cyan
 
 foreach ($elb in $preChangeData) {
     if ($elb.DeletionProtection -ne "true") {
