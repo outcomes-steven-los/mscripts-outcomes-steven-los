@@ -1,4 +1,5 @@
-# Configuration
+
+# Parameters
 $monitoringRoleArn = "arn:aws:iam::123456789012:role/rds-monitoring-role"  # <-- Update this
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "RDS_EnhancedMonitoring_PreChange_$timestamp.csv"
