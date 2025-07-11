@@ -3,7 +3,7 @@
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "RDS_AutoMinorUpgrade_PreChange_$timestamp.csv"
 $postChangeCsv = "RDS_AutoMinorUpgrade_PostChange_$timestamp.csv"
-$region = "us-east-1"
+$region = "us-east-1" # Update if needed
 
 # Step 1: List all RDS instances
 Write-Host "Fetching all RDS instances......" -ForegroundColor Cyan
