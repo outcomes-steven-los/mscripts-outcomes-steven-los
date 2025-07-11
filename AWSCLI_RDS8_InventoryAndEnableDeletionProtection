@@ -1,5 +1,5 @@
 
-# Configuration
+# Parameters
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "RDS_DeletionProtection_PreChange_$timestamp.csv"
 $postChangeCsv = "RDS_DeletionProtection_PostChange_$timestamp.csv"
