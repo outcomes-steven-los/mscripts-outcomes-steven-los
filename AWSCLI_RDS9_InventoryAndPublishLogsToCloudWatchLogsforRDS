@@ -1,5 +1,5 @@
 
-# Configuration
+# Parameters
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $preChangeCsv = "RDS_LogExports_PreChange_$timestamp.csv"
 $postChangeCsv = "RDS_LogExports_PostChange_$timestamp.csv"
